@@ -1,21 +1,14 @@
 # PCRE Matcher
-Matches a list of URLs against a list of PCREs, meant to detect visits to malicious sites. 
+Matches a list of URLs against a list of PCREs (Perl Compatible Regular Expressions), meant to detect visits to malicious sites. The PCREs can be maintained by you or provided by intel sources; the list of URLs come from your proxy logs; the list of exceptions is a list you maintain to eliminate false positive matches (not all the PCREs are perfect.)
 
-# Example
-The regular expression 
-
-hxxp:\/\/([^\.\/]+\.)+(edu|net|com|org)\/sync\/v\d{1,3}
-
-Matches
-
-hxxp://test.evaluationserver.com/sync/v1
-
-Note: this is a fake site.
-
+# Input Files
+* list of pcres
+* list of urls
+* list of exceptions (optional)
 
 # Usage
 ```
-./pcrematcher -u [url filename] -p [pcre filename]
+./pcrematcher -u [url filename] -p [pcre filename] -e [exception list filename]
 ```
 # Requirements
 Go
