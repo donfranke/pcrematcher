@@ -17,12 +17,6 @@ import (
 	"strings"
 )
 
-func check(e error) {
-	if e != nil {
-		panic(e)
-	}
-}
-
 var rawpcres []string
 var validpcres []string
 var rawurls []string
@@ -30,9 +24,16 @@ var validurls []string
 var exceptions []string
 
 type Result struct {
-	url string
-	pcre string
+	url    string
+	pcre   string
 	action string
+}
+
+// generic error handler
+func check(e error) {
+	if e != nil {
+		panic(e)
+	}
 }
 
 func main() {
@@ -46,39 +47,37 @@ func main() {
 
 	// 2. load PCREs into memory
 	loadPCREs(*pcrefile)
-	
+
 	// 3. load URLs into memory
 	loadURLs(*urlsfile)
-	
+
 	// 4. load exemptions into memory
 	if *exfile != "" {
 		loadExceptions(*exfile)
 	}
-	
+
 	// 5. compare urls against pcres
-	preexemptresults := findMatches()	
+	preexemptresults := findMatches()
 
 	// 6. compare results against exceptions
 	postexemptresults := findExemptions(preexemptresults)
 
-	
 	// iterate and print results
 	fmt.Println("\"ACTION\",\"URL\",\"PCRE\"")
-	for _, item := range postexemptresults {	
-		fmt.Printf("\"%s\",\"%s\",\"%s\"\n", item.action,item.url,item.pcre)
+	for _, item := range postexemptresults {
+		fmt.Printf("\"%s\",\"%s\",\"%s\"\n", item.action, item.url, item.pcre)
 	}
-
-	//fmt.Println(postexceptresults)
 }
 
+// match URL list against PCRE list
 func findMatches() []Result {
 	i := 0
-	r := Result{} // empty result object
-	var r2 []Result  // array of result objects
+	r := Result{}   // empty result object
+	var r2 []Result // array of result objects
 	var pcre string
-	
+
 	// iterate urls
-	for _, url := range validurls {		
+	for _, url := range validurls {
 		// iterate pcres
 		for _, pcre = range validpcres {
 			ismatch, err := regexp.MatchString(pcre, url)
@@ -87,46 +86,44 @@ func findMatches() []Result {
 			if ismatch {
 				// add result to result array
 				r.url = url
-				r.pcre=pcre
-				r.action="FOUND"
-				r2 = append(r2,r)
+				r.pcre = pcre
+				r.action = "FOUND"
+				r2 = append(r2, r)
 			}
 		}
 
 		i++
 	}
-	return r2  // returning list of matching URLs-PCREs
+	return r2 // returning list of matching URLs-PCREs
 }
 
+// iterate results and identify exemptions
 func findExemptions(inr []Result) []Result {
 	i := 0
-	r := Result{}  // empty result object
-	var r2 []Result  // array of result objects
+	r := Result{}   // empty result object
+	var r2 []Result // array of result objects
 	var action string
 
-	// header for CSV results
-
 	// iterate urls
-	for _, rs := range inr {	
-		action="FOUND"	
+	for _, rs := range inr {
+		action = "FOUND"
 		// iterate exception regexes
 		for _, ex := range exceptions {
 			exr, _ := regexp.MatchString(ex, rs.url)
-			//fmt.Println("\t",ex)					
-			if(exr) {
+			//fmt.Println("\t",ex)
+			if exr {
 				action = "EXEMPT"
 				break
 			}
 		}
-		r = Result{rs.url,rs.pcre,action}
-		r2 = append(r2,r)
-
+		r = Result{rs.url, rs.pcre, action}
+		r2 = append(r2, r)
 		i++
 	}
 	return r2
 }
 
-
+// load PCREs into memory
 func loadPCREs(pf string) {
 	// local variables
 	i := 1
