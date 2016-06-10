@@ -12,6 +12,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/glenn-brown/golang-pkg-pcre/src/pkg/pcre"
 	"io/ioutil"
 	"regexp"
 	"strings"
@@ -24,9 +25,9 @@ var validurls []string
 var exceptions []string
 
 type Result struct {
-	url    string
-	pcre   string
-	action string
+	url        string
+	pcrestring string
+	action     string
 }
 
 // generic error handler
@@ -65,7 +66,7 @@ func main() {
 	// iterate and print results
 	fmt.Println("\"ACTION\",\"URL\",\"PCRE\"")
 	for _, item := range postexemptresults {
-		fmt.Printf("\"%s\",\"%s\",\"%s\"\n", item.action, item.url, item.pcre)
+		fmt.Printf("\"%s\",\"%s\",\"%s\"\n", item.action, item.url, item.pcrestring)
 	}
 }
 
@@ -74,19 +75,21 @@ func findMatches() []Result {
 	i := 0
 	r := Result{}   // empty result object
 	var r2 []Result // array of result objects
-	var pcre string
+	//var pcres string
 
 	// iterate urls
 	for _, url := range validurls {
 		// iterate pcres
-		for _, pcre = range validpcres {
-			ismatch, err := regexp.MatchString(pcre, url)
-			check(err)
+		for _, p := range validpcres {
+			//ismatch, err := regexp.MatchString(pcres, url)
+			_ = p
+			//_ = url
+			m := pcre.MustCompile(p, 0).MatcherString(url, 0)
 
-			if ismatch {
+			if m.Matches() {
 				// add result to result array
 				r.url = url
-				r.pcre = pcre
+				r.pcrestring = p
 				r.action = "FOUND"
 				r2 = append(r2, r)
 			}
@@ -110,13 +113,12 @@ func findExemptions(inr []Result) []Result {
 		// iterate exception regexes
 		for _, ex := range exceptions {
 			exr, _ := regexp.MatchString(ex, rs.url)
-			//fmt.Println("\t",ex)
 			if exr {
 				action = "EXEMPT"
 				break
 			}
 		}
-		r = Result{rs.url, rs.pcre, action}
+		r = Result{rs.url, rs.pcrestring, action}
 		r2 = append(r2, r)
 		i++
 	}
@@ -144,12 +146,17 @@ func loadPCREs(pf string) {
 		if !iscomment && len(item) > 0 {
 			// extract regex from string
 			findtab := strings.Index(item, "\t")
-			item = item[0:findtab]
+			if findtab > 0 {
+				item = item[0:findtab]
+			}
 			// validate regex
-			testr, err := regexp.Compile(item)
+			testr, err := pcre.Compile(item, 0)
 			// dereference variable
 			_ = testr
 			if err != nil {
+				fmt.Println(err)
+				fmt.Printf("INVALID: %s\n", item)
+
 				i++
 			} else {
 				validpcres = append(validpcres, item)
