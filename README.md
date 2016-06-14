@@ -1,16 +1,17 @@
 
 # PCRE Matcher
-asdMatches a list of URLs against a list of PCREs (Perl Compatible Regular Expressions), meant to detect visits to malicious sites. The PCREs can be maintained by you or provided by intel sources; the list of URLs come from your proxy logs; the list of exceptions is a list you maintain to eliminate false positive matches (not all the PCREs are perfect.)
+Matches a list of URLs against a list of PCREs (Perl Compatible Regular Expressions), meant to detect visits to malicious sites. The PCREs can be maintained by you or provided by intel sources; the list of URLs come from your proxy logs; the list of exceptions is a list you maintain to eliminate false positive matches (not all the PCREs are perfect.)
 
 # Input Files
 * list of pcres
 * list of urls
-* list of exceptions (optional)
+* list of exemptions (optional)
+
 
 # Usage
 ```
-./pcrematcher -u [url filename] -p [pcre filename] -e [exception list filename]
+./pcrematcher -u [url filename] -p [pcre filename] -e [exception list filename] -se [show exemptions (Y/N)]
 ```
 # Requirements
-Go
-github.com/glenn-brown/golang-pkg-pcre/src/pkg/pcre
+* Go
+* github.com/glenn-brown/golang-pkg-pcre/src/pkg/pcre

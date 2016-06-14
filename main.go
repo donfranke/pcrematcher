@@ -6,7 +6,12 @@
 //  The list of PCRE's can be obtained from open source intel
 //  The list of URLs can be obtained fom proxy logs or other sources
 
-//   usage:  ./gomatch -u [url file path/name] -p [pcre file path/name]
+// usage: ./pcrematcher 
+//           -u [url filename] 
+//           -p [pcre filename] 
+//           -e [exception list filename] 
+//           -se [show exemptions (Y/N)]
+
 package main
 
 import (
@@ -16,13 +21,15 @@ import (
 	"io/ioutil"
 	"regexp"
 	"strings"
+	"log"
+	"strconv"
 )
 
 var rawpcres []string
 var validpcres []string
 var rawurls []string
 var validurls []string
-var exceptions []string
+var exemptions []string
 
 type Result struct {
 	url        string
@@ -38,13 +45,22 @@ func check(e error) {
 }
 
 func main() {
-	fmt.Println("Running...")
 
 	// 1. get command-line arguments
 	pcrefile := flag.String("p", "", "Name of PCRE File")
 	urlsfile := flag.String("u", "", "Name of URLs File")
-	exfile := flag.String("e", "", "Name of Exceptions File")
+	exfile := flag.String("e", "", "Name of exemptions File")
+	showexempt := flag.String("se","","Show exempt URLs [Y/N]")
 	flag.Parse()
+
+	// make sure all flags are provided by user
+	if(*pcrefile==""||*urlsfile==""||*exfile==""||*showexempt=="") {
+		showUsage()
+		log.Fatal("Not enough arguments supplied")
+	}
+	log.Print("Started")
+
+	fmt.Println(*showexempt=="Y")
 
 	// 2. load PCREs into memory
 	loadPCREs(*pcrefile)
@@ -54,29 +70,38 @@ func main() {
 
 	// 4. load exemptions into memory
 	if *exfile != "" {
-		loadExceptions(*exfile)
+		loadexemptions(*exfile)
 	}
 
 	// 5. compare urls against pcres
 	preexemptresults := findMatches()
 
-	// 6. compare results against exceptions
+	// 6. compare results against exemptions
 	postexemptresults := findExemptions(preexemptresults)
 
-	// iterate and print results
+	// 7. iterate and print results
 	fmt.Println("\"ACTION\",\"URL\",\"PCRE\"")
+
 	for _, item := range postexemptresults {
-		fmt.Printf("\"%s\",\"%s\",\"%s\"\n", item.action, item.url, item.pcrestring)
+		// only display exempt URLs if user requested it
+		if((*showexempt=="Y"&&item.action=="EXEMPT")||item.action!="EXEMPT") {			
+			fmt.Printf("\"%s\",\"%s\",\"%s\"\n", item.action, item.url, item.pcrestring)
+		}
 	}
 }
 
 // match URL list against PCRE list
 func findMatches() []Result {
+	// local variables
 	i := 0
+	var l string
+	var g string
 	r := Result{}   // empty result object
 	var r2 []Result // array of result objects
-	//var pcres string
-
+	var pct float64
+	j := len(validurls)
+	
+	fmt.Print("\tCompleted: ")
 	// iterate urls
 	for _, url := range validurls {
 		// iterate pcres
@@ -94,7 +119,22 @@ func findMatches() []Result {
 				r2 = append(r2, r)
 			}
 		}
+		// keep user updated on progress
+		if(i%1000==0) {
+			pct = float64(i)/float64(j)*100
+			f := strconv.FormatFloat(pct, 'f', -1, 64)
+			if(len(f)>6) {
+				g = f[:strings.Index(f,".")]
+			} else {
+				g = f
+			}
 
+			if(l!=g) {
+				fmt.Printf("%s",g)
+				fmt.Print("%...")
+			}
+			l = g
+		}
 		i++
 	}
 	return r2 // returning list of matching URLs-PCREs
@@ -110,8 +150,8 @@ func findExemptions(inr []Result) []Result {
 	// iterate urls
 	for _, rs := range inr {
 		action = "FOUND"
-		// iterate exception regexes
-		for _, ex := range exceptions {
+		// iterate exemption regexes
+		for _, ex := range exemptions {
 			exr, _ := regexp.MatchString(ex, rs.url)
 			if exr {
 				action = "EXEMPT"
@@ -164,7 +204,7 @@ func loadPCREs(pf string) {
 		}
 		j++
 	}
-	fmt.Printf("\t%d PCREs loaded ", j)
+	fmt.Printf("\tPCREs loaded: %d ", j)
 	fmt.Printf("(%d considered invalid)\n", i)
 }
 
@@ -192,13 +232,22 @@ func loadURLs(uf string) {
 		}
 		i++
 	}
-	fmt.Printf("\t%d URLs loaded\n", i)
+	fmt.Printf("\tURLs loaded: %d\n", i)
 }
 
 // load list of domains that are whitelisted
-func loadExceptions(ef string) {
+func loadexemptions(ef string) {
 	dat, err := ioutil.ReadFile(ef)
 	check(err)
-	exceptions = strings.Split(string(dat), "\n")
-	fmt.Printf("\t%d Exception(s) loaded\n", len(exceptions))
+	exemptions = strings.Split(string(dat), "\n")
+	fmt.Printf("\tExemptions loaded: %d\n", len(exemptions))
+}
+
+func showUsage() {
+	fmt.Print("\nERROR: Not enough command-line arguments provided.\n")
+	fmt.Print(strings.Repeat("=",60),"\n")
+	fmt.Print("\t-p = path/file of PCRE file\n")
+	fmt.Print("\t-u = path/file of URL file\n")
+	fmt.Print("\t-e = path/file of exemptions file\n")
+	fmt.Print("\t-se = indicate whether or not to show exempt URLs in results\n\n")
 }
