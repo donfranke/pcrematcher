@@ -76,7 +76,8 @@ func main() {
 	preexemptresults := findMatches()
 
 	// 6. compare results against exemptions
-	postexemptresults := findExemptions(preexemptresults)
+	//postexemptresults := findExemptions(preexemptresults)
+	postexemptresults := preexemptresults
 
 	// 7. iterate and print results
 	fmt.Println("\"ACTION\",\"URL\",\"PCRE\"")
@@ -151,11 +152,12 @@ func findExemptions(inr []Result) []Result {
 		action = "FOUND"
 		// iterate exemption regexes
 		for _, ex := range exemptions {
-			exr, _ := regexp.MatchString(ex, rs.url)
+			exr, e := regexp.MatchString(ex, rs.url)
 			if exr {
 				action = "EXEMPT"
 				break
 			}
+			check(e)
 		}
 		r = Result{rs.url, rs.pcrestring, action}
 		r2 = append(r2, r)
