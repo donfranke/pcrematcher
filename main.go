@@ -76,11 +76,12 @@ func main() {
 	preexemptresults := findMatches()
 
 	// 6. compare results against exemptions
-	//postexemptresults := findExemptions(preexemptresults)
-	postexemptresults := preexemptresults
+	postexemptresults := findExemptions(preexemptresults)
+	//postexemptresults := preexemptresults
+	//fmt.Print(len(postexemptresults))
 
 	// 7. iterate and print results
-	fmt.Println("\"ACTION\",\"URL\",\"PCRE\"")
+	fmt.Println("\n\"ACTION\",\"URL\",\"PCRE\"")
 
 	for _, item := range postexemptresults {
 		// only display exempt URLs if user requested it
@@ -94,21 +95,22 @@ func main() {
 func findMatches() []Result {
 	// local variables
 	i := 0
-	var l string
-	var g string
 	r := Result{}   // empty result object
 	var r2 []Result // array of result objects
-	var pct float64
 	j := len(validurls)
 
 	fmt.Print("\tCompleted: ")
 	// iterate urls
 	for _, url := range validurls {
 		// iterate pcres
+		k := 0
 		for _, p := range validpcres {
+			//_ = "breakpoint"
 			//ismatch, err := regexp.MatchString(pcres, url)
-			_ = p
+			//_ = p
 			//_ = url
+			//fmt.Printf("%d -- [[%s]] %s\n",k,url,p)
+			k++
 			m := pcre.MustCompile(p, 0).MatcherString(url, 0)
 
 			if m.Matches() {
@@ -119,23 +121,10 @@ func findMatches() []Result {
 				r2 = append(r2, r)
 			}
 		}
-		// keep user updated on progress
-		if i%1000 == 0 {
-			pct = float64(i) / float64(j) * 100
-			f := strconv.FormatFloat(pct, 'f', -1, 64)
-			if len(f) > 6 {
-				g = f[:strings.Index(f, ".")]
-			} else {
-				g = f
-			}
 
-			if l != g {
-				fmt.Printf("%s", g)
-				fmt.Print("%...")
-			}
-			l = g
-		}
+		displayCounter(i,j)
 		i++
+		
 	}
 	return r2 // returning list of matching URLs-PCREs
 }
@@ -152,12 +141,16 @@ func findExemptions(inr []Result) []Result {
 		action = "FOUND"
 		// iterate exemption regexes
 		for _, ex := range exemptions {
-			exr, e := regexp.MatchString(ex, rs.url)
-			if exr {
-				action = "EXEMPT"
-				break
+			if(ex!="") {
+				exr, e := regexp.MatchString(ex, rs.url)
+				if exr {
+					_ = "breakpoint"
+					//fmt.Print("\nEXEMPT\n")
+					action = "EXEMPT"
+					break
+				}
+				check(e)
 			}
-			check(e)
 		}
 		r = Result{rs.url, rs.pcrestring, action}
 		r2 = append(r2, r)
@@ -251,4 +244,26 @@ func showUsage() string {
 	message += "\t-e = path/file of exemptions file\n"
 	message += "\t-se = indicate whether or not to show exempt URLs in results [Y/N]\n\n"
 	return message
+}
+func displayCounter(i int, j int) {
+	var g,l string
+	var pct float64
+
+	// keep user updated on progress
+	if i%1000 == 0 {
+		pct = float64(i) / float64(j) * 100
+		f := strconv.FormatFloat(pct, 'f', -1, 64)
+		if len(f) > 6 {
+			g = f[:strings.Index(f, ".")]
+		} else {
+			g = f
+		}
+
+		if l != g {
+			fmt.Printf("%s", g)
+			fmt.Print("%...")
+		}
+		l = g
+	}
+	
 }
