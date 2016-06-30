@@ -30,6 +30,7 @@ var validpcres []string
 var rawurls []string
 var validurls []string
 var exemptions []string
+var l string
 
 type Result struct {
 	url        string
@@ -45,6 +46,7 @@ func check(e error) {
 }
 
 func main() {
+	l = "0"
 
 	// 1. get command-line arguments
 	pcrefile := flag.String("p", "", "Name of PCRE File")
@@ -246,7 +248,7 @@ func showUsage() string {
 	return message
 }
 func displayCounter(i int, j int) {
-	var g,l string
+	var g string
 	var pct float64
 
 	// keep user updated on progress
@@ -254,11 +256,11 @@ func displayCounter(i int, j int) {
 		pct = float64(i) / float64(j) * 100
 		f := strconv.FormatFloat(pct, 'f', -1, 64)
 		if len(f) > 6 {
-			g = f[:strings.Index(f, ".")]
+			g = f[:strings.Index(f, ".")] // string version of integer version of percentage
 		} else {
 			g = f
 		}
-
+		// g is the string version of integer version of percentage
 		if l != g {
 			fmt.Printf("%s", g)
 			fmt.Print("%...")
