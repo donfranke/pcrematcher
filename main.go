@@ -12,17 +12,19 @@
 //           -e [exception list filename]
 //           -se [show exemptions (Y/N)]
 
+// Example usage: ./pcrematcher -p /tmp/pcres.txt -u /tmp/proxylog.csv -e /tmp/exemptions.txt -se N
+
 package main
 
 import (
 	"flag"
 	"fmt"
-	"github.com/glenn-brown/golang-pkg-pcre/src/pkg/pcre"
 	"io/ioutil"
 	"log"
 	"regexp"
 	"strconv"
 	"strings"
+	"github.com/glenn-brown/golang-pkg-pcre/src/pkg/pcre"
 )
 
 var rawpcres []string
@@ -53,15 +55,15 @@ func main() {
 	urlsfile := flag.String("u", "", "Name of URLs File")
 	exfile := flag.String("e", "", "Name of exemptions File")
 	showexempt := flag.String("se", "", "Show exempt URLs [Y/N]")
+	showskipped := flag.String("ss", "", "Show skipped URLs [Y/N]")
+
 	flag.Parse()
 
-	// make sure all flags are provided by user
+	// 1a. make sure all flags are provided by user
 	if *pcrefile == "" || *urlsfile == "" || *exfile == "" || *showexempt == "" {
 		log.Fatal("EXECUTION HALTED: Not enough arguments supplied\n\n" + showUsage())
 	}
 	log.Print("Started")
-
-	fmt.Println(*showexempt == "Y")
 
 	// 2. load PCREs into memory
 	loadPCREs(*pcrefile)
@@ -79,15 +81,13 @@ func main() {
 
 	// 6. compare results against exemptions
 	postexemptresults := findExemptions(preexemptresults)
-	//postexemptresults := preexemptresults
-	//fmt.Print(len(postexemptresults))
 
 	// 7. iterate and print results
 	fmt.Println("\n\"ACTION\",\"URL\",\"PCRE\"")
 
 	for _, item := range postexemptresults {
 		// only display exempt URLs if user requested it
-		if (*showexempt == "Y" && item.action == "EXEMPT") || item.action != "EXEMPT" {
+		if (*showexempt == "Y" && item.action == "EXEMPT") || (*showskipped == "Y" && item.action == "SKIPPED - TOO LONG") || item.action == "FOUND" {
 			fmt.Printf("\"%s\",\"%s\",\"%s\"\n", item.action, item.url, item.pcrestring)
 		}
 	}
@@ -101,32 +101,33 @@ func findMatches() []Result {
 	var r2 []Result // array of result objects
 	j := len(validurls)
 
-	fmt.Print("\tCompleted: ")
+	fmt.Print("\nProgress: ")
 	// iterate urls
 	for _, url := range validurls {
 		// iterate pcres
 		k := 0
-		for _, p := range validpcres {
-			//_ = "breakpoint"
-			//ismatch, err := regexp.MatchString(pcres, url)
-			//_ = p
-			//_ = url
-			//fmt.Printf("%d -- [[%s]] %s\n",k,url,p)
-			k++
-			m := pcre.MustCompile(p, 0).MatcherString(url, 0)
+		if len(url) > 1000 {
+			r.url = url[:1000]
+			r.pcrestring = "NA"
+			r.action = "SKIPPED - TOO LONG"
+			r2 = append(r2, r)
+		} else {
+			for _, p := range validpcres {
+				k++
+				m := pcre.MustCompile(p, 0).MatcherString(url, 0)
 
-			if m.Matches() {
-				// add result to result array
-				r.url = url
-				r.pcrestring = p
-				r.action = "FOUND"
-				r2 = append(r2, r)
+				if m.Matches() {
+					// add result to result array
+					r.url = url
+					r.pcrestring = p
+					r.action = "FOUND"
+					//fmt.Println(p,"-->",url)
+					r2 = append(r2, r)					
+				}
 			}
 		}
-
 		displayCounter(i,j)
-		i++
-		
+		i++		
 	}
 	return r2 // returning list of matching URLs-PCREs
 }
@@ -136,24 +137,27 @@ func findExemptions(inr []Result) []Result {
 	i := 0
 	r := Result{}   // empty result object
 	var r2 []Result // array of result objects
-	var action string
 
 	// iterate urls
 	for _, rs := range inr {
-		action = "FOUND"
+		action := rs.action
 		// iterate exemption regexes
-		for _, ex := range exemptions {
-			if(ex!="") {
-				exr, e := regexp.MatchString(ex, rs.url)
-				if exr {
-					_ = "breakpoint"
-					//fmt.Print("\nEXEMPT\n")
-					action = "EXEMPT"
-					break
+		if len(rs.url) <= 1000 {
+			for _, ex := range exemptions {
+				if(ex!="") {
+					//if(strings.Index(ex,"space")>-1 && strings.Index(rs.url,"space")>-1) {
+					//	fmt.Printf("\nEXEMPTION MATCH: %s\n",rs.url);
+					//}
+					exr, e := regexp.MatchString(ex, rs.url)
+					if exr {
+						_ = "breakpoint"
+						action = "EXEMPT"
+						break
+					}
+					check(e)
 				}
-				check(e)
 			}
-		}
+		} 
 		r = Result{rs.url, rs.pcrestring, action}
 		r2 = append(r2, r)
 		i++
@@ -163,9 +167,10 @@ func findExemptions(inr []Result) []Result {
 
 // load PCREs into memory
 func loadPCREs(pf string) {
+	fmt.Println("loadPCREs()")
 	// local variables
-	i := 1
-	j := 1
+	i := 0
+	j := 0
 
 	// load pcre file into memory
 	dat, err := ioutil.ReadFile(pf)
@@ -185,20 +190,19 @@ func loadPCREs(pf string) {
 			if findtab > 0 {
 				item = item[0:findtab]
 			}
-			// validate regex
-			testr, err := pcre.Compile(item, 0)
-			// dereference variable
-			_ = testr
-			if err != nil {
-				fmt.Println(err)
-				fmt.Printf("INVALID: %s\n", item)
-
+	
+			re, reerr := pcre.Compile(item, 0)
+			//fmt.Println(item,"-->",reerr)
+			_ = re
+			if reerr != nil {
+				fmt.Printf("\tINVALID PCRE: %s\n", item)
 				i++
 			} else {
 				validpcres = append(validpcres, item)
 			}
+			j++
 		}
-		j++
+		
 	}
 	fmt.Printf("\tPCREs loaded: %d ", j)
 	fmt.Printf("(%d considered invalid)\n", i)
@@ -221,7 +225,6 @@ func loadURLs(uf string) {
 	for _, item := range rawurls {
 		// exclude comments
 		iscomment := comments.MatchString(item)
-
 		if !iscomment && len(item) > 0 && i > 1 {
 			item = strings.Trim(item, "\"")
 			validurls = append(validurls, item)
@@ -266,6 +269,5 @@ func displayCounter(i int, j int) {
 			fmt.Print("%...")
 		}
 		l = g
-	}
-	
+	}	
 }
